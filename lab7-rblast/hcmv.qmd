@@ -6,6 +6,10 @@ date: Mar. 18, 2026
 output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 Today we're going to apply our work on R to Bioinformatic data sets. The typical output of a DNA sequencing experiment is a fastq file, consisting of often millions of configs which need to be stitched together (do you remember the two ways we do that?). Fastq files are different from fasta files as they contain quality scores -- this is useful to see how reliable your fastq data is.  The first tool we are going to use is Fastqc, to interpret the results of our fastq files.
 
 # Quality Control
@@ -30,6 +34,7 @@ rqc(path = folder, pattern = ".fastq.gz")
 Bioconductor and Biostrings are especially powerful tools to examine fasta files in R.  In this section, we'll learn some tools to manipulate them.  
 
 ```{r}
+setwd('~/Downloads')
 library(Biostrings)
 seqs <- readDNAStringSet("Full_cmv_259sequences_Aln.fasta")
 ```
@@ -37,15 +42,17 @@ seqs <- readDNAStringSet("Full_cmv_259sequences_Aln.fasta")
 As Fasta files are labeled, you can identify specific sequences, either by loading a specfic label or identifying a keyword:
 
 ```{r}
+setwd('~/Downloads')
 my_seq <- seqs["Europe_United Kingdom_GQ221974.1_Human_herpesvirus_5_strain_3157_complete_genome"]
 names_with_uk <- grep("United Kingdom", names(seqs), ignore.case = TRUE)
-UK_seqs <- seqs[names_with_europe]
+UK_seqs <- seqs[names_with_uk]
 UK_subset <- subseq(UK_seqs, start = 20000, end = 25000)
 ```
 
 You can, using R, code an aligned genome as a matrix, in order to identify snps. 
 
 ```{r}
+setwd('~/Downloads')
 mat <- as.matrix(UK_seqs)
 snp_positions <- which(apply(mat, 2, function(col) {
   bases <- col[col %in% c("A","C","G","T")]
@@ -67,6 +74,7 @@ names(snp_list) <- paste0("Pos_", snp_positions)
 The final skill we need to learn is how to align .fasta files to a reference genome.  The data we have today is aligned so we'll have to arbitrarily "unalign" it.  We will use our first sequence as the reference.  
 
 ```{r}
+setwd('~/Downloads')
 UK_seqs_nogap <- DNAStringSet(gsub("-", "", as.character(UK_seqs))) 
 ref <- seqs[6]
 ```
@@ -74,6 +82,7 @@ ref <- seqs[6]
 The region of interest from hcmv will be our query site.   
 
 ```{r}
+setwd('~/Downloads')
 library(Biostrings)
 query <- readDNAStringSet("example.fasta")
 ref <- seqs["Europe_Germany_JX512204.1_Human_herpesvirus_5_strain_HAN16_complete_genome"]
@@ -95,17 +104,41 @@ alignments
 
 a. Look at the 'Cycle-specific Base Call Proportion' rqc file.  What is the ratio of A/C/G/T in cycles 1-10. What is the ratio of A/C/G/T in cycles 65-75?  Based on your knowledge of DNA-sequencing, propose a hypothesis for why the cycles have a different ratio.
 
+In cycles 1-10, the base proportions are more uneven and jump around a lot. Some bases are higher or lower than others. After cycle 10, the proportions become more stable, but they are slightly uneven, with some bases (like C and G) appearing more often. This likely happens because the beginning of sequencing can be a little unstable, and later cycles cna have small biases due to decreasing accuracy. 
+
 b. Look at the 'Cycle specific Quality Distribution'. What is the typial quality of cycles 1-10?  What is the typical quality of cycles 65-75?  Based on your knowledge of DNA-sequencing, propose a hypothesis for why the cycles have a different quality
+
+From the graphs, the early cycles (1-10) are a bit more variable, but overall the quality becomes more consistent after that. Even though the proportions look stable later on, sequencing quality still slightly decreases over time due to weaker signal and small erros building up. This means the reads are genrally good quality, but later cycles maybe still have slightly lower accuracy than easiler ones. 
 
 # Homework Question 2: Loading a File, Reverse Complements
 
 For one of the research projects, we will be studying a specific protein coding site of hcmv associated with the transition of hcmv from latent to active. Align the following two queries to any genome in the reference file. Which one successfully aligns? What does that mean about the site of interest?
 
 ```{r}
+setwd('~/Downloads')
 query <- readDNAStringSet("hcmv15-hcmv1b-1.fasta")
 reversecompquery <- reverseComplement(query)
-```
+ref<-seqs["Europe_Germany_JX512204.1_Human_herpesvirus_5_strain_HAN16_complete_genome"]
+library(Biostrings)
+ref_nogap <- DNAString(gsub("-", "", as.character(ref)))
+hits_query <- matchPattern(query[[1]], ref_nogap, max.mismatch = 20)
+hits_reverse <- matchPattern(reversecompquery[[1]], ref_nogap, max.mismatch = 20)
 
+hits_query
+hits_reverse
+```
+The reverse complement is the sequence that signs successfully. The original query does not align. This means the site of interest is on the opposite DNA strand of the reference and complemented to match correctly. 
 # Homework Question 3: Isolating a Site
 
 Isolate the 'hcmv15-hcmv1b-1.fasta' site in all 259 seqs. Your final result should be a DNAString set of 259 sequences about 4-5 kb long.  
+
+```{r}
+seqs_nogap <- DNAStringSet(gsub("-", "", as.character(seqs)))
+site_start <- 187075
+site_end <- 191699
+isolated_site <- subseq(seqs_nogap, start = site_start, end = site_end)
+isolated_site
+length(isolated_site)
+width(isolated_site)
+```
+The site was isolated from all 259 sequences using the coordinates found in the reference genome. After removing gaps, the region from positions 187075 to 191699 was extracted from each sequence. The result was 259 sequences, each 4625 bp long, showing that the same site was successfully isolated from every genome.
